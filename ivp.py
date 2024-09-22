@@ -64,52 +64,6 @@ class Initial_Value_Problem:
         self.legendfont = 18
         self.ticksfont = 18
 
-        
-    def plotEvolution(self,EqNum,formalisms=[0,1,2]):
-        """
-        Input: Index of the equation to be ploted, list of formalisms
-        to be plotted
-
-        Ouput: A graph with three 2D subplots
-        """
-        N = self.N
-        Nt = self.Nt
-        u = np.zeros((3,Nt,N))
-        for i in formalisms:
-            u[i] = np.flipud(np.load(self.results_paths[i])[EqNum])
-    
-        fig, ax = plt.subplots(nrows = 1,ncols=3,figsize=(12, 4))
-        
-        plt.subplots_adjust(left=0.07, right=0.95,wspace=0.1,hspace=0.4,top=0.95,bottom=0.1)
-        
-        xmin = -0.5*self.dx
-        xmax = 1.0+xmin
-        tmin = -0.5*self.dt
-        tmax = tmin + self.dt*Nt
-        aspect_ratio = (xmax-xmin) / (tmax-tmin)
-        vmax = np.max(np.abs(u[:2,:,:]))
-
-        for i in range(3):
-            im = ax[i].imshow(u[i], cmap='coolwarm',extent=[xmin,xmax,tmin,tmax], vmin=-vmax,vmax=vmax,aspect=aspect_ratio) 
-        
-        ax[0].set_title("Classical",fontsize=self.titlefont)
-        ax[1].set_title("SVF",fontsize=self.titlefont)
-        ax[2].set_title("SEF",fontsize=self.titlefont)
-        for i in range(3):
-            ax[i].set_xlabel('x', fontsize=self.axisfont)
-            ax[i].tick_params(axis='both', labelsize=self.axisfont)
-            ax[i].set_xticks(np.arange(0, 1, 0.5))
-        ax[0].set_ylabel('t', fontsize=self.axisfont)
-        for i in range(1,3):
-            ax[i].yaxis.set_ticklabels([])  # Set tick labels to an empty list
-
-        # Use any of the images to generate the colorbar
-        cbar = fig.colorbar(im, ax=ax.ravel().tolist(),shrink=0.8)  
-        cbar.ax.tick_params(labelsize=self.ticksfont)
-        
-        fig.savefig(self.graphs_paths["2d"], dpi=300)
-        plt.show()
-
                
     def set_initial_parameters(self):
         """
@@ -156,58 +110,6 @@ class Initial_Value_Problem:
         
         return np.real(u_loc)
 
-
-    def plotState(self,u_loc):
-        """
-        Input: Numpy array
-
-        Output: Graph in the direct space
-        """
-        fig, ax = plt.subplots(figsize=(5, 4))    
-        ax.plot(self.x,u_loc, c='#E74C3C',lw=2)
-        
-        ax.set_xlabel('x', fontsize=self.axisfont)
-        ax.set_ylabel('psi', fontsize=self.axisfont)
-        ax.set_title("|psi (x) >",fontsize=self.titlefont)
-        ax.tick_params(axis='both', labelsize=self.ticksfont)
-    
-        plt.show()
-
-    def Cdot(self,theta_state,phi_state,power=0):
-        """
-        This function calculates products of the form:
-                Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
-        but classically and much faster
-
-        Input: theta_state, phi_state, p
-        Output: Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
-        """
-        power = round(power)
-        # Build the controled U(φ) and U†(θ)
-    
-        phi_state = np.roll(phi_state,-power)
-    
-        return np.real(np.dot(np.conj(theta_state),phi_state))
-
-    #def Sdot(self,theta,phi,power=0):
-    def Sdot(self,theta_state,phi_state,power=0):
-        """
-        This function calculates products of the form:
-                Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
-        fast and then simulates monte carlo sampling
-        """
-        theta_norm = np.sum(np.abs(theta_state)**2)**0.5
-        phi_norm = np.sum(np.abs(phi_state)**2)**0.5
-        exact_expVal = self.Cdot(theta_state,phi_state,power)/(theta_norm*phi_norm)
-        if np.abs(exact_expVal) >= 0.99:
-            return exact_expVal*theta_norm*phi_norm
-        else:
-            P0 = 0.5*(1.0+exact_expVal)
-            counts_of_0 = np.random.binomial(self.shots, P0, 1)[0]
-            measured_expVal = -1.0 + 2.0*(counts_of_0)/float(self.shots)
-            return measured_expVal*theta_norm*phi_norm
-        
-    
 
     def evolveClassically(self):
         """
@@ -284,9 +186,7 @@ class Initial_Value_Problem:
             # First rk step
             for EqNum in range(NE):
                 # Find parameters
-                noise = 0.8*l_p[EqNum][0] * np.random.rand(NofParams)
-                noise = 0.0
-                l_star[EqNum] = minimize(self.CF, (l_p[EqNum]+noise),args=(1,EqNum), 
+                l_star[EqNum] = minimize(self.CF, l_p[EqNum],args=(1,EqNum), 
                                          method="nelder-mead",tol=self.tol).x
                 # Save wave function (optional)
                 self.u_star[EqNum] = self.FastStateVector(l_star[EqNum])
@@ -294,9 +194,7 @@ class Initial_Value_Problem:
             # Second rk step
             for EqNum in range(NE):
                 # Find parameters
-                noise = 0.8*l_p[EqNum][0] * np.random.rand(NofParams)
-                noise = 0.0
-                l_p[EqNum] = minimize(self.CF, (l_star[EqNum]+0.3*noise),args=(2,EqNum), 
+                l_p[EqNum] = minimize(self.CF, l_star[EqNum],args=(2,EqNum), 
                                       method="nelder-mead",tol=self.tol).x
                 # Save wave function (optional)
                 u[EqNum,nTime,:] = self.FastStateVector(l_p[EqNum])
@@ -310,31 +208,107 @@ class Initial_Value_Problem:
     def evolveWithSampling(self):
         self.evolveWithStateVector(sampling=True)
 
-    # This function computes the cost function with usual aritmethic
+    # Classical dot product
+    def Cdot(self,theta_state,phi_state,power=0):
+        """
+        This function calculates products of the form:
+                Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
+        but classically and much faster
+
+        Input: theta_state, phi_state, p
+        Output: Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
+        """
+        power = round(power)
+
+        # Apply the shift operator
+        phi_state = np.roll(phi_state,-power)
+
+        # Compute the dot product
+        return np.real(np.dot(np.conj(theta_state),phi_state))
+
+    # Dot product but with sampling error, just what
+    # the hadamard test would output
+    def Sdot(self,theta_state,phi_state,power=0):
+        """
+        This function calculates products of the form:
+                Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
+        fast and then simulates monte carlo sampling
+
+        Input: theta_state, phi_state, p
+        Output: Re{ < 0| U†(θ) ⊕^p U(φ)|0 > }
+        """
+        # We will need to normalize the states to include
+        # the sampling
+        theta_norm = np.sum(np.abs(theta_state)**2)**0.5
+        phi_norm = np.sum(np.abs(phi_state)**2)**0.5
+        
+        # Compute the classical dot product but normalize
+        # the result
+        exact_expVal = self.Cdot(theta_state,phi_state,power)/(theta_norm*phi_norm)
+
+        # The probability of measuring 0 in the ancilla qubit
+        P0 = 0.5*(1.0+exact_expVal)
+        
+        # Simulate that we execute (self.shots) times a poisson
+        # experiments with P0 probability of sucess.
+        counts_of_0 = np.random.binomial(self.shots, P0, 1)[0]
+        
+        # Aproximate the expectation value
+        measured_expVal = -1.0 + 2.0*(counts_of_0)/float(self.shots)
+        
+        # Return the result with the norms again
+        return measured_expVal*theta_norm*phi_norm
+
+    # This is the Cost Function
     def CF(self,params,rk,EqNum):
-        # State
-        ui = self.FastStateVector(params)
+        """
+        This is the Cost Function. Since we are implementing
+        a Runge-Kutta of order 2, there will be 2 RK steps.
+
+        Input: params is the vector of parameters,
+            rk = 1 or 2 is the step of the Runge-Kutta,
+            EqNum = 0,1,2,etc represents the number of the 
+            equation being evolved. 
+        Output: CF
+        """
+        # Compute the u funciton at this current i step,
+        # that is why it is called ui
+        ui = self.FastStateVector(params) # 1d numpy array
+        
         # Set of the functions at the previous time step
-        u_p = self.u_p
+        u_p = self.u_p # set of 1d numpy arrays (2d numpy array)
+        
         # Set of functions at the intermidiate time step
-        u_star = self.u_star
+        u_star = self.u_star # set of 1d numpy arrays (2d numpy array)
         
         CFL = self.CFL
         dt  = self.dt
 
         # Dot function, can be Cdot or Sdot
         def dot(theta_state,phi_state,power=0):
+            # self.formalism is a global integer that determines
+            # the formalism being used
+            # 1 -> State Vector Formalism
+            # 2 -> Sampling Error Formalism
             if(self.formalism==1):
                 return self.Cdot(theta_state,phi_state,power)
             elif(self.formalism==2):
                 return self.Sdot(theta_state,phi_state,power)
             
-
+        
         def rhs(ui,u_loc,EqNum):
             """
             Computes the product:
-                   Δt < p | rhs(q) >
+                   Δt < ui | rhs(u_loc) >
             u_loc can be u_p or u_star
+            
+            Input:
+                ui: 1d numpy array containing the function at
+                    the current time step
+                u_loc: set of 1d numpy arrays containing values
+                    of the system of functions computed at the
+                    previous time step or at the intermidiate
+                    Runge-Kutta step
             """
             if self.equation_name == 'wave':
                 if EqNum == 0:
@@ -344,7 +318,7 @@ class Initial_Value_Problem:
                 else:
                     rhs = dt * (dot(ui,u_loc[0]))
             elif self.equation_name == 'advection':
-                rhs = 0.5 * CFL * (dot(ui,u_loc[0],1) - dot(ui,u_loc[0],-1))
+                rhs = - 0.5 * CFL * (dot(ui,u_loc[0],1) - dot(ui,u_loc[0],-1))
             return rhs
 
         if rk == 1:
@@ -355,56 +329,162 @@ class Initial_Value_Problem:
         
         return result 
 
-def convergeceTest(ni,nf,M_in,EqNum,formalisms,f_exact):
+    def plotEvolution(self,EqNum,formalisms=[0,1,2]):
+        """
+        Input: Index of the equation to be ploted, list of formalisms
+        to be plotted
+
+        Ouput: A graph with three 2D subplots
+        """
+        N = self.N
+        Nt = self.Nt
+        u = np.zeros((3,Nt,N))
+        for i in formalisms:
+            u[i] = np.flipud(np.load(self.results_paths[i])[EqNum])
+    
+        fig, ax = plt.subplots(nrows = 1,ncols=3,figsize=(12, 4))
+        
+        plt.subplots_adjust(left=0.07, right=0.95,wspace=0.1,
+                            hspace=0.4,top=0.95,bottom=0.1)
+        
+        xmin = -0.5*self.dx
+        xmax = 1.0+xmin
+        tmin = -0.5*self.dt
+        tmax = tmin + self.dt*Nt
+        aspect_ratio = (xmax-xmin) / (tmax-tmin)
+        vmax = np.max(np.abs(u[:2,:,:]))
+
+        for i in range(3):
+            im = ax[i].imshow(u[i], cmap='coolwarm',
+                              extent=[xmin,xmax,tmin,tmax], 
+                              vmin=-vmax,vmax=vmax,aspect=aspect_ratio) 
+        
+        ax[0].set_title("Classical",fontsize=self.titlefont)
+        ax[1].set_title("SVF",fontsize=self.titlefont)
+        ax[2].set_title("SEF",fontsize=self.titlefont)
+        for i in range(3):
+            ax[i].set_xlabel('x', fontsize=self.axisfont)
+            ax[i].tick_params(axis='both', labelsize=self.axisfont)
+            ax[i].set_xticks(np.arange(0, 1, 0.5))
+        ax[0].set_ylabel('t', fontsize=self.axisfont)
+        for i in range(1,3):
+            ax[i].yaxis.set_ticklabels([])  # Set tick labels to an empty list
+
+        # Use any of the images to generate the colorbar
+        cbar = fig.colorbar(im, ax=ax.ravel().tolist(),shrink=0.8)  
+        cbar.ax.tick_params(labelsize=self.ticksfont)
+        
+        fig.savefig(self.graphs_paths["2d"], dpi=300)
+        plt.show()
+
+    def plotState(self,u_loc):
+        """
+        Input: Numpy array
+
+        Output: Graph in the direct space
+        """
+        fig, ax = plt.subplots(figsize=(5, 4))    
+        ax.plot(self.x,u_loc, c='#E74C3C',lw=2)
+        
+        ax.set_xlabel('x', fontsize=self.axisfont)
+        ax.set_ylabel('psi', fontsize=self.axisfont)
+        ax.set_title("|psi (x) >",fontsize=self.titlefont)
+        ax.tick_params(axis='both', labelsize=self.ticksfont)
+    
+        plt.show()
+
+
+def convergeceTest(list_n,list_M,EqNum,formalisms,u_exact,results_path,path_for_graph):
+    """
+    This is a global function. The Initial_Value_Problem object
+    is helpful to find the solution of the IVP with one particular
+    n, M, etc. Here, we need information about executions with
+    different n or M values.
+
+    Input: 
+    list_n: is a list of the values n that you want to compare
+    list_M: is a list of the M value that corresponds to each
+            n value.
+    formalisms: list of formalisms to be plotted
+    u_exact: function that takes in x (1d numpy array) and t (scalar)
+            returns the value of the function evaluated in the
+            discrete domain at time t.
+    results_path: Directory where the results of the executions
+            are found.
+    path_for_graph: Directory where you want to save your graph.
+
+    """
+    # We are going make three graphs, one for each formalism.
+    # if one formalism is not included in the formalisms list,
+    # the graph will be empty
     NofGraphs = 3
     
     fig, ax = plt.subplots(nrows = 1,ncols=NofGraphs,figsize=(10, 4))
-    #fig, ax = plt.subplots(nrows = 1,ncols=NofGraphs,figsize=(10, 4))
     plt.subplots_adjust(left=0.12, right=0.95,wspace=0.1,hspace=0.4,top=0.9,bottom=0.2)
 
-    file_paths = ["classical","state_vector","sampling"]
+    formalisms_names = ["classical","state_vector","sampling"]
+
+    # List of numerical solutions with each formalism
     f_num = [0,0,0]
-    for n in range(ni,nf+1):
+
+    # Maximum value of the L1 norm, for plotting purposes
+    vmax = 0.0
+    # For every execution
+    for k in range(len(list_n)):
+        n = list_n[k]
+        M = list_M[k]
         N = 2**n
-
-        M = 3 if n == 3 else M_in
-
-        for i in formalisms:
-            f_num[i] = np.load("Data/{}_n{}M{}.npy".format(file_paths[i],n,M))[EqNum]
         
-        Nt = f_num[0].shape[0]
+        for i in formalisms:
+            f_num[i] = np.load("{}{}_n{}M{}.npy".format(
+                results_path,formalisms_names[i],n,M))[EqNum]
+        
+            Nt = f_num[i].shape[0]
         dx = 1.0/float(N)
         dt = 0.5*dx
+        x = np.arange(N)*dx
         t = np.arange(Nt)*dt
-        x = np.arange(N)/float(N)
-        
-        result = np.zeros((NofGraphs,Nt))
-        for i in range(Nt):
-            f = f_exact(x,t[i])
-            for j in formalisms:
-                result[j,i] = np.sum(np.abs(f-f_num[j][i]))*dx
-        for j in formalisms:
-            ax[j].plot(t,result[j],label = "n = {}".format(n))
-        if (n == ni):
-            vmax = 1.1* np.max(result)
 
+        # Error as a function of time for every formalism
+        error = np.zeros((NofGraphs,Nt))
+        
+        # For each formalism
+        for i in formalisms:
+            # Compute the L1 norm of the error at each time step
+            for j in range(Nt):
+                # Compute the exact funtion at time t
+                f = u_exact(x,t[j]) # 1d array
+                error[i,j] = np.sum(np.abs(f-f_num[i][j]))*dx
+
+            # Plot the L1 norm as a funtion of time
+            ax[i].plot(t,error[i],label = "n = {}".format(n))
+
+            # Maximum value, no make all graphs be coherent
+            if (1.1* np.max(error) > vmax):
+                vmax = 1.1* np.max(error)
+    
+    # ========================================
+    # ------------- Graph --------------------
+    # ========================================
+    
+    # Font sizes
     titulo = 23
     ejes = 20
     legendSize = 15
     ticksSize = 20
     titles = ["Classical","SVF","SEF"]
-    for i in formalisms:
+
+    # Adjust each graph
+    for i in range(NofGraphs):
         ax[i].set_title(titles[i],fontsize=titulo)
         ax[i].set_xlabel('t', fontsize=ejes)
         ax[i].tick_params(axis='both', labelsize=ejes)
         ax[i].legend(fontsize=legendSize,loc='upper right')
         ax[i].set_ylim(0,vmax)
-       #ax[i].set_xticks(np.arange(0, 1, 0.25))
-    for i in range(1,NofGraphs):
-        ax[i].yaxis.set_ticklabels([])  # Set tick labels to an empty list
+        if i >= 1:
+            ax[i].yaxis.set_ticklabels([])  # Set tick labels to an empty list
     
     ax[0].set_ylabel('L1 norm', fontsize=ejes)
-
     
-    fig.savefig('Graphs/convergence_M{}.png'.format(M), dpi=300)
+    fig.savefig(path_for_graph, dpi=300)
     plt.show()
