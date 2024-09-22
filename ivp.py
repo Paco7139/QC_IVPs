@@ -1,9 +1,15 @@
+"""
+Author: Francisco Guzman-Cajica
+Last date modified: 21/September/2024
+Purpose: Implement a VQA using the Fast SVF and
+         Fast SEF for the Method of Lines to solve
+         the Advection Equation and the Wave equation.
+"""
+
 # Math and graphing tools
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from scipy.sparse import diags
-from scipy.sparse.linalg import spsolve
 from math import pi
 
 class Initial_Value_Problem:
@@ -393,12 +399,12 @@ class Initial_Value_Problem:
         Output: Graph in the direct space
         """
         fig, ax = plt.subplots(figsize=(5, 4))    
-        ax.plot(self.x,u_loc, c='#E74C3C',lw=2)
+        ax.plot(self.x,u_loc, c='#E74C3C',lw=1.5)
         
-        ax.set_xlabel('x', fontsize=self.axisfont)
-        ax.set_ylabel('psi', fontsize=self.axisfont)
-        ax.set_title("|psi (x) >",fontsize=self.titlefont)
-        ax.tick_params(axis='both', labelsize=self.ticksfont)
+        ax.set_xlabel('x', fontsize=12)
+        ax.set_ylabel('psi', fontsize=12)
+        ax.set_title("|psi (x) >",fontsize=14)
+        ax.tick_params(axis='both', labelsize=12)
     
         plt.show()
 
