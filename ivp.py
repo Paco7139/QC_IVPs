@@ -239,15 +239,24 @@ class Initial_Value_Problem:
         """
         # We will need to normalize the states to include
         # the sampling
-        theta_norm = np.sum(np.abs(theta_state)**2)**0.5
-        phi_norm = np.sum(np.abs(phi_state)**2)**0.5
+        theta_norm = np.sum(theta_state**2)**0.5
+        phi_norm = np.sum(phi_state**2)**0.5
         
         # Compute the classical dot product but normalize
         # the result
         exact_expVal = self.Cdot(theta_state,phi_state,power)/(theta_norm*phi_norm)
 
         # The probability of measuring 0 in the ancilla qubit
+
         P0 = 0.5*(1.0+exact_expVal)
+
+        if abs(exact_expVal) > 1.001:
+            print("alerta")
+        if (P0 > 1.0):
+            P0 = 1.0
+        elif (P0 < 0.0):
+            P0 = 0.0
+        
         
         # Simulate that we execute (self.shots) times a poisson
         # experiments with P0 probability of sucess.
